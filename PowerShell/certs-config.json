@@ -1,0 +1,15 @@
+{
+    "CACommonName": "Example-RootCA",
+    "DNSName": "example.com",
+    "Organization": "--------",
+    "OrganizationUnit": "-----------",
+    "Country": "--",
+    "CASecret": "----------------------------------------",
+    "CertSecret": "--------------------------------------",
+    "HashAlgorithm": "SHA256",
+    "KeyLength": 4096,
+    "CAValidityYears": 10,
+    "CertValidityYears": 2,
+    "OutPath": ".\\Certs\\",
+    "CertStoreLocation": "Cert:\\CurrentUser\\My"
+}
