@@ -1,15 +1,26 @@
 {
-    "CACommonName": "Example-RootCA",
-    "DNSName": "example.com",
-    "Organization": "--------",
-    "OrganizationUnit": "-----------",
-    "Country": "--",
-    "CASecret": "----------------------------------------",
-    "CertSecret": "--------------------------------------",
-    "HashAlgorithm": "SHA256",
-    "KeyLength": 4096,
-    "CAValidityYears": 10,
-    "CertValidityYears": 2,
-    "OutPath": ".\\Certs\\",
-    "CertStoreLocation": "Cert:\\CurrentUser\\My"
+    "RootCA": {
+        "CommonName": "My-RootCA",
+        "Organization": "Company",
+        "OrganizationUnit": "IT Department",
+        "Country": "--",
+        "Secret": "--------------------------------",
+        "HashAlgorithm": "SHA256",
+        "KeyLength": 4096,
+        "ValidityYears": 10,
+        "OutPath": ".\\Certs\\",
+        "CertStoreLocation": "Cert:\\CurrentUser\\My"
+    },
+    "SignedCert": {
+        "DNSName": "example.com",
+        "Organization": "Company",
+        "OrganizationUnit": "IT Department",
+        "Country": "--",
+        "Secret": "---------------------------------",
+        "HashAlgorithm": "SHA256",
+        "KeyLength": 4096,
+        "ValidityYears": 2,
+        "OutPath": ".\\Certs\\",
+        "CertStoreLocation": "Cert:\\CurrentUser\\My"
+    }
 }
