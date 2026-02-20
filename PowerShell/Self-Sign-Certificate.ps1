@@ -33,7 +33,7 @@ try {
     # 2. Generate the Signed Certificate
     Write-Host "Issuing certificate for $($Config.DNSName)..." -ForegroundColor Cyan
     $certParams = @{
-        Subject           = "CN=$($Config.DNSName), O=$($Config.Organization)"
+        Subject           = "CN=$($Config.DNSName), O=$($Config.Organization), OU=$($Config.OrganizationUnit), C=$($Config.Country)"
         DnsName           = @($Config.DNSName, "www.$($Config.DNSName)")
         Signer            = $rootCert
         CertStoreLocation = $Config.CertStoreLocation
@@ -76,3 +76,4 @@ finally {
 }
 
 Write-Host "`nSuccess! Files for $($Config.DNSName) created in $($Config.OutPath)" -ForegroundColor Green
+
