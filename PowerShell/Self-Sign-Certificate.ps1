@@ -10,12 +10,13 @@ if (!(Test-Path $ConfigFileName)) {
     exit 1
 }
 
-$config = Get-Content $ConfigFileName -Raw | ConvertFrom-Json
+$Config = $(Get-Content $ConfigFileName -Raw | ConvertFrom-Json).SignedCert
+$RootConfig = $(Get-Content $ConfigFileName -Raw | ConvertFrom-Json).RootCA # Load Root CA config for paths and parameters
 
-if (!(Test-Path $config.OutPath)) { New-Item -ItemType Directory -Path $config.OutPath -Force | Out-Null }
+if (!(Test-Path $Config.OutPath)) { New-Item -ItemType Directory -Path $Config.OutPath -Force | Out-Null }
 
-$CAOutPath = Join-Path $config.OutPath "Root"
-$RootPfxPath = (Join-Path $CAOutPath "$($config.CACommonName).pfx")
+$OutPath = Join-Path $Config.OutPath "Root"
+$RootPfxPath = (Join-Path $OutPath "$($RootConfig.CommonName).pfx")
 
 write-Host "Using Root CA PFX: $RootPfxPath" -ForegroundColor Cyan
 
@@ -26,52 +27,52 @@ try {
     $rootStore.Open("ReadWrite")
     
     $rootCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
-    $rootCert.Import($RootPfxPath, $config.CASecret, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
+    $rootCert.Import($RootPfxPath, $RootConfig.Secret, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
     $rootStore.Add($rootCert)
 
     # 2. Generate the Signed Certificate
-    Write-Host "Issuing certificate for $($config.DNSName)..." -ForegroundColor Cyan
+    Write-Host "Issuing certificate for $($Config.DNSName)..." -ForegroundColor Cyan
     $certParams = @{
-        Subject           = "CN=$($config.DNSName), O=$($config.Organization)"
-        DnsName           = @($config.DNSName, "www.$($config.DNSName)")
+        Subject           = "CN=$($Config.DNSName), O=$($Config.Organization)"
+        DnsName           = @($Config.DNSName, "www.$($Config.DNSName)")
         Signer            = $rootCert
-        CertStoreLocation = $config.CertStoreLocation
+        CertStoreLocation = $Config.CertStoreLocation
         KeyExportPolicy   = "Exportable"
         Type              = "SSLServerAuthentication"
-        HashAlgorithm     = $config.HashAlgorithm
-        KeyLength         = $config.KeyLength
-        NotAfter          = (Get-Date).AddYears($config.CertValidityYears)
+        HashAlgorithm     = $Config.HashAlgorithm
+        KeyLength         = $Config.KeyLength
+        NotAfter          = (Get-Date).AddYears($Config.ValidityYears)
         TextExtension     = @("2.5.29.37={text}1.3.6.1.5.5.7.3.1") # Explicit Server Auth EKU
     }
     $childCert = New-SelfSignedCertificate @certParams
 
     # 3. Export PFX
-    $pfxPath = Join-Path $config.OutPath "$($config.DNSName).pfx"
-    $pfxData = $childCert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $config.CertSecret)
+    $pfxPath = Join-Path $Config.OutPath "$($Config.DNSName).pfx"
+    $pfxData = $childCert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $Config.Secret)
     [System.IO.File]::WriteAllBytes($pfxPath, $pfxData)
 
     # 4. Export CRT (Public Key)
     $base64 = [System.Convert]::ToBase64String($childCert.RawData, "InsertLineBreaks")
-    "-----BEGIN CERTIFICATE-----`r`n$base64`r`n-----END CERTIFICATE-----" | Out-File (Join-Path $config.OutPath "$($config.DNSName).crt") -Encoding ascii
+    "-----BEGIN CERTIFICATE-----`r`n$base64`r`n-----END CERTIFICATE-----" | Out-File (Join-Path $Config.OutPath "$($Config.DNSName).crt") -Encoding ascii
 
     # 5. Export KEY (Private Key - PKCS#8)
     Write-Host "Extracting Private Key..." -ForegroundColor Yellow
     $rsaKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($childCert)
     $keyBytes = $rsaKey.Key.Export([System.Security.Cryptography.CngKeyBlobFormat]::Pkcs8PrivateBlob)
     $keyBase64 = [System.Convert]::ToBase64String($keyBytes, "InsertLineBreaks")
-    "-----BEGIN PRIVATE KEY-----`r`n$keyBase64`r`n-----END PRIVATE KEY-----" | Out-File (Join-Path $config.OutPath "$($config.DNSName).key") -Encoding ascii
+    "-----BEGIN PRIVATE KEY-----`r`n$keyBase64`r`n-----END PRIVATE KEY-----" | Out-File (Join-Path $Config.OutPath "$($Config.DNSName).key") -Encoding ascii
 
 }
 finally {
     # 6. CLEANUP: Remove both from Store so the machine stays clean
     Write-Host "Cleaning up Windows Certificate Store..." -ForegroundColor Gray
     if ($null -ne $childCert) {
-        Get-ChildItem $config.CertStoreLocation | Where-Object { $_.Thumbprint -eq $childCert.Thumbprint } | Remove-Item
+        Get-ChildItem $Config.CertStoreLocation | Where-Object { $_.Thumbprint -eq $childCert.Thumbprint } | Remove-Item
     }
     if ($null -ne $rootCert) {
-        Get-ChildItem $config.CertStoreLocation | Where-Object { $_.Thumbprint -eq $rootCert.Thumbprint } | Remove-Item
+        Get-ChildItem $Config.CertStoreLocation | Where-Object { $_.Thumbprint -eq $rootCert.Thumbprint } | Remove-Item
     }
     if ($null -ne $rootStore) { $rootStore.Close() }
 }
 
-Write-Host "`nSuccess! Files for $($config.DNSName) created in $($config.OutPath)" -ForegroundColor Green
+Write-Host "`nSuccess! Files for $($Config.DNSName) created in $($Config.OutPath)" -ForegroundColor Green
