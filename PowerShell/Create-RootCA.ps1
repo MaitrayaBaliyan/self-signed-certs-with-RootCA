@@ -10,39 +10,39 @@ if (!(Test-Path $ConfigFileName)) {
     exit 1
 }
 
-$config = Get-Content $ConfigFileName -Raw | ConvertFrom-Json
-$CAOutPath = Join-Path $config.OutPath "Root"
+$Config = $(Get-Content $ConfigFileName -Raw | ConvertFrom-Json).RootCA
+$OutPath = Join-Path $Config.OutPath "Root"
 
 # 1. Setup Environment
-if (!(Test-Path $CAOutPath)) { New-Item -ItemType Directory -Path $CAOutPath -Force | Out-Null }
+if (!(Test-Path $OutPath)) { New-Item -ItemType Directory -Path $OutPath -Force | Out-Null }
 
 
 # 2. Define CA Parameters
 $rootParams = @{
-    Subject           = "CN=$($config.CACommonName), O=$($config.Organization), C=$($config.Country), OU=$($config.OrganizationUnit)"
-    FriendlyName      = "$($config.CACommonName) (Internal Root)"
-    CertStoreLocation = $config.CertStoreLocation
+    Subject           = "CN=$($Config.CommonName), O=$($Config.Organization), C=$($Config.Country), OU=$($Config.OrganizationUnit)"
+    FriendlyName      = "$($Config.CommonName) (Internal Root)"
+    CertStoreLocation = $Config.CertStoreLocation
     KeyExportPolicy   = "Exportable"
     KeyUsage          = "CertSign", "CRLSign", "DigitalSignature"
-    HashAlgorithm     = $config.HashAlgorithm
-    KeyLength         = $config.KeyLength
-    NotAfter          = (Get-Date).AddYears($config.CAValidityYears)
+    HashAlgorithm     = $Config.HashAlgorithm
+    KeyLength         = $Config.KeyLength
+    NotAfter          = (Get-Date).AddYears($Config.ValidityYears)
     # Basic Constraints: ca=1 (This marks it as a real CA)
     TextExtension     = @("2.5.29.19={text}ca=1&pathlength=0")
 }
 
-Write-Host "Generating Production Root CA: $($config.CACommonName)" -ForegroundColor Cyan
+Write-Host "Generating Production Root CA: $($Config.CommonName)" -ForegroundColor Cyan
 $rootCA = New-SelfSignedCertificate @rootParams
 
 # 3. Export PFX
-$securePass = ConvertTo-SecureString -String $config.CASecret -Force -AsPlainText
-Export-PfxCertificate -Cert $rootCA -FilePath (Join-Path $CAOutPath "$($config.CACommonName).pfx") -Password $securePass | Out-Null
+$securePass = ConvertTo-SecureString -String $Config.Secret -Force -AsPlainText
+Export-PfxCertificate -Cert $rootCA -FilePath (Join-Path $OutPath "$($Config.CommonName).pfx") -Password $securePass | Out-Null
 
 # 4. Export Public CER (To be distributed/trusted)
-Export-Certificate -Cert $rootCA -FilePath (Join-Path $CAOutPath "$($config.CACommonName).crt") | Out-Null
+Export-Certificate -Cert $rootCA -FilePath (Join-Path $OutPath "$($Config.CommonName).crt") | Out-Null
 
 # 5. Cleanup local store (Don't install yet)
-Get-ChildItem $config.CertStoreLocation | Where-Object { $_.Thumbprint -eq $rootCA.Thumbprint } | Remove-Item
+Get-ChildItem $Config.CertStoreLocation | Where-Object { $_.Thumbprint -eq $rootCA.Thumbprint } | Remove-Item
 
-Write-Host "Success! Root CA created in $CAOutPath" -ForegroundColor Green
+Write-Host "Success! Root CA created in $OutPath" -ForegroundColor Green
 Write-Host "Note: Install the .crt file into 'Trusted Root Certification Authorities' to use it." -ForegroundColor Yellow
