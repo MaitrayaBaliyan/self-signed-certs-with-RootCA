@@ -34,7 +34,7 @@ try {
     Write-Host "Issuing certificate for $($Config.DNSName)..." -ForegroundColor Cyan
     $certParams = @{
         Subject           = "CN=$($Config.DNSName), O=$($Config.Organization), OU=$($Config.OrganizationUnit), C=$($Config.Country)"
-        DnsName           = @($Config.DNSName, "www.$($Config.DNSName)")
+        DnsName           = @($Config.DNSName) + $Config.AltDNSNames
         Signer            = $rootCert
         CertStoreLocation = $Config.CertStoreLocation
         KeyExportPolicy   = "Exportable"
@@ -46,21 +46,26 @@ try {
     }
     $childCert = New-SelfSignedCertificate @certParams
 
+    $fileName = $certParams.DnsName
+    if ($fileName.StartsWith("*.")) {
+        $fileName = $fileName.Substring(2) + ".wildcard"
+    }
+
     # 3. Export PFX
-    $pfxPath = Join-Path $Config.OutPath "$($Config.DNSName).pfx"
+    $pfxPath = Join-Path $Config.OutPath "$($fileName).pfx"
     $pfxData = $childCert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $Config.Secret)
     [System.IO.File]::WriteAllBytes($pfxPath, $pfxData)
 
     # 4. Export CRT (Public Key)
     $base64 = [System.Convert]::ToBase64String($childCert.RawData, "InsertLineBreaks")
-    "-----BEGIN CERTIFICATE-----`r`n$base64`r`n-----END CERTIFICATE-----" | Out-File (Join-Path $Config.OutPath "$($Config.DNSName).crt") -Encoding ascii
+    "-----BEGIN CERTIFICATE-----`r`n$base64`r`n-----END CERTIFICATE-----" | Out-File (Join-Path $Config.OutPath "$($fileName).crt") -Encoding ascii
 
     # 5. Export KEY (Private Key - PKCS#8)
     Write-Host "Extracting Private Key..." -ForegroundColor Yellow
     $rsaKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($childCert)
     $keyBytes = $rsaKey.Key.Export([System.Security.Cryptography.CngKeyBlobFormat]::Pkcs8PrivateBlob)
     $keyBase64 = [System.Convert]::ToBase64String($keyBytes, "InsertLineBreaks")
-    "-----BEGIN PRIVATE KEY-----`r`n$keyBase64`r`n-----END PRIVATE KEY-----" | Out-File (Join-Path $Config.OutPath "$($Config.DNSName).key") -Encoding ascii
+    "-----BEGIN PRIVATE KEY-----`r`n$keyBase64`r`n-----END PRIVATE KEY-----" | Out-File (Join-Path $Config.OutPath "$($fileName).key") -Encoding ascii
 
 }
 finally {
@@ -76,4 +81,3 @@ finally {
 }
 
 Write-Host "`nSuccess! Files for $($Config.DNSName) created in $($Config.OutPath)" -ForegroundColor Green
-
