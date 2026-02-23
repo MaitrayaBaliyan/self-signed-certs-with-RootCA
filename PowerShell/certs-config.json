@@ -13,6 +13,7 @@
     },
     "SignedCert": {
         "DNSName": "example.com",
+        "AltDNSNames": [],
         "Organization": "Company",
         "OrganizationUnit": "IT Department",
         "Country": "--",
@@ -24,3 +25,4 @@
         "CertStoreLocation": "Cert:\\CurrentUser\\My"
     }
 }
+
